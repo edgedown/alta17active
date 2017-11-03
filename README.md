@@ -8,6 +8,6 @@ pip install -r requirements.txt
 jupyter notebook
 ```
 
-Open notebook: [http://localhost:8888/notebooks/notebook/datadatadata.ipynb]
+Open notebook: http://localhost:8888/notebooks/notebook/datadatadata.ipynb
 
 Enjoy!
