@@ -13,6 +13,9 @@ class Dataset(object):
     def add_label(self, text, label):
         self.text_to_label[text] = label
 
+    def __len__(self):
+        return len(self.text_to_label)
+
     def __iter__(self):
         return ((text, label) for text, label in
                 self.text_to_label.items())
@@ -26,8 +29,22 @@ class Dataset(object):
     @classmethod
     def from_csv(cls, fname):
         with open(fname) as f:
-            return cls({text: label for text, label in
-                        csv.reader(f, delimiter=',')})
+            data = {}
+            for row in csv.reader(f, delimiter=','):
+                assert 1 <= len(row) <= 2
+                if len(row) == 1:
+                    text = row[0]
+                    label = None
+                else:
+                    text, label = row
+                    label = {
+                        'True': True,
+                        'False': False,
+                        '': None,
+                        'None': None,
+                    }[label]
+                data[text] = label
+            return cls(data)
 
     def update(self, other):
         self.text_to_label.update(other.text_to_label)
