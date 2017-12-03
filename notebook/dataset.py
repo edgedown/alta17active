@@ -2,28 +2,28 @@ from collections import Counter
 import csv
 import random
 
-from sklearn.datasets import fetch_20newsgroups
-
 
 class Dataset(object):
     """ Encapsulates unlabelled and labelled examples. """
     def __init__(self, text_to_label=None):
-        self.text_to_label = text_to_label or {}
+        self._oracle = text_to_label or {}
+        self._annotation = {text: None for text, _
+                           in self._oracle.items()}
 
     def add_label(self, text, label):
-        self.text_to_label[text] = label
+        self._annotation[text] = label
 
     def __len__(self):
-        return len(self.text_to_label)
+        return len(self._annotation)
 
     def __iter__(self):
         return ((text, label) for text, label in
-                self.text_to_label.items())
+                self._annotation.items())
 
     def to_csv(self, fname):
         with open(fname, 'w') as f:
             w = csv.writer(f, delimiter=',')
-            for text, label in self.text_to_label.items():
+            for text, label in self._annotation.items():
                 w.writerow((label, text))
 
     @classmethod
@@ -47,30 +47,44 @@ class Dataset(object):
             return cls(data)
 
     def update(self, other):
-        self.text_to_label.update(other.text_to_label)
+        self._annotation.update(other._annotation)
+
+    def get_oracle_label(self, text):
+        return self._oracle[text]
+
+    def seed(self, n):
+        """ Seed with n labels from oracle. """
+        unlabelled = list(self.unlabelled_items)
+        random.shuffle(unlabelled)
+        for i, (text, label) in enumerate(unlabelled):
+            if i >= n:
+                break
+            label = self.get_oracle_label(text)
+            self.add_label(text, label)
+
+    @property
+    def oracle_items(self):
+        return self._oracle.items()
+
+    @property
+    def labelled_items(self):
+        for text, label in self:
+            if label in {True, False}:
+                yield text, label
+
+    @property
+    def unlabelled_items(self):
+        for text, label in self:
+            if label is None:
+                yield text, label
+
+    @property
+    def copy(self):
+        d = Dataset()
+        d._annotation = dict(self._annotation)  # copy
+        d._oracle = dict(self._oracle)  # copy
+        return d
 
     @property
     def label_distribution(self):
-        return dict(Counter(self.text_to_label.values()))
-
-
-def build_sample_corpus(subset='train'):
-    """ Fetches newsgroupd data and returns a Dataset. """
-    newsgroups_train = fetch_20newsgroups(subset=subset)
-    label_names = {index: name for index, name in
-                   enumerate(newsgroups_train.target_names)}
-    # Transform to guns or not.
-    for i, name in list(label_names.items()):
-        label_names[i] = name == 'talk.politics.guns'
-    dataset = Dataset({text: label_names[index]
-                      for text, index in zip(newsgroups_train.data,
-                                             newsgroups_train.target)})
-    unlabel(dataset)
-    return dataset
-
-
-def unlabel(dataset, p=0.01):
-    """ Randomly removes some labels. """
-    for text, label in dataset:
-        if random.random() > p:
-            dataset.add_label(text, None)
+        return dict(Counter(self._annotation.values()))

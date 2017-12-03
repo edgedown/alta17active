@@ -4,13 +4,9 @@ from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
 
 
-def train_classifier(dataset, cv=3):
-    X, y = [], []
-    for text, label in dataset:
-        assert isinstance(text, str)
-        assert label in {True, False}
-        X.append(text)
-        y.append(label)
+def train_classifier(X, y, cv=3):
+    assert all(isinstance(text, str) for text in X)
+    assert all(label in {True, False} for label in y)
     print('Got {} labelled samples'.format(len(X)))
     pipeline = Pipeline([
         ('vectorizer', CountVectorizer()),
