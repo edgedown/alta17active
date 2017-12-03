@@ -1,96 +1,99 @@
 from sklearn.metrics import f1_score, make_scorer
+import itertools
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 f1_scorer = make_scorer(f1_score)
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.naive_bayes import GaussianNB
-from sklearn.svm import SVC
-from sklearn.datasets import load_digits
-from sklearn.model_selection import learning_curve
-from sklearn.model_selection import ShuffleSplit
-
-
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
-                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
-    """
-    Generate a simple plot of the test and training learning curve.
-
-    Parameters
-    ----------
-    estimator : object type that implements the "fit" and "predict" methods
-        An object of that type which is cloned for each validation.
-
-    title : string
-        Title for the chart.
-
-    X : array-like, shape (n_samples, n_features)
-        Training vector, where n_samples is the number of samples and
-        n_features is the number of features.
-
-    y : array-like, shape (n_samples) or (n_samples, n_features), optional
-        Target relative to X for classification or regression;
-        None for unsupervised learning.
-
-    ylim : tuple, shape (ymin, ymax), optional
-        Defines minimum and maximum yvalues plotted.
-
-    cv : int, cross-validation generator or an iterable, optional
-        Determines the cross-validation splitting strategy.
-        Possible inputs for cv are:
-          - None, to use the default 3-fold cross-validation,
-          - integer, to specify the number of folds.
-          - An object to be used as a cross-validation generator.
-          - An iterable yielding train/test splits.
-
-        For integer/None inputs, if ``y`` is binary or multiclass,
-        :class:`StratifiedKFold` used. If the estimator is not a classifier
-        or if ``y`` is neither binary nor multiclass, :class:`KFold` is used.
-
-        Refer :ref:`User Guide <cross_validation>` for the various
-        cross-validators that can be used here.
-
-    n_jobs : integer, optional
-        Number of jobs to run in parallel (default 1).
-    """
+def plot_learning_curve(train_sizes, train_scores, test_scores):
+    plt.clf()
     plt.figure()
-    plt.title(title)
-    if ylim is not None:
-        plt.ylim(*ylim)
-    plt.xlabel("Training examples")
-    plt.ylabel("Score")
-    train_sizes, train_scores, test_scores = learning_curve(
-        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+    plt.xlabel("N training examples")
+    plt.ylabel("F1 score")
+    plt.ylim((0.0, 1.0))
+    train_sizes_mean = np.mean(train_sizes, axis=1)
     train_scores_mean = np.mean(train_scores, axis=1)
     train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
     test_scores_std = np.std(test_scores, axis=1)
     plt.grid()
-
-    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+    
+    plt.fill_between(train_sizes_mean, train_scores_mean - train_scores_std,
                      train_scores_mean + train_scores_std, alpha=0.1,
                      color="r")
-    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
-                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
-    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+    plt.fill_between(train_sizes_mean, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1,
+                     color="g")
+    plt.plot(train_sizes_mean, train_scores_mean, 'o-', color="r",
              label="Training score")
-    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
-             label="Cross-validation score")
-
+    plt.plot(train_sizes_mean, test_scores_mean, 'o-', color="g",
+             label="Test score")
+    
     plt.legend(loc="best")
     return plt
 
 
-def bootstrap(X, y):
-    """ Sample with replacement, N = len(X). """
-    assert len(X) == len(y)
-    def iter_samples():
-        N = len(X)
-        for _ in range(N):
-            i = random.randint(0, N - 1)
-            X_bootstrap.append(X[i])
-            y_bootstrap.append(y[i])
-    return zip(*iter_samples())
-        
+def run_simulations(sampler, pool, test, n=5):
+    """
+    Run n simulated learning-curve experiments.
+    
+    sampler - an function for sampling from pool
+    pool - pool dataset (with oracle labels)
+    test - test dataset (with oracle labels)
+    n - number of bootstraps for confidence intervals (default=10)
+    seed_size - seed pool with this many labelled items
+    """
+    # run simulations
+    runs = []
+    for i in range(n):
+        print('Running simulation {}..'.format(i))
+        runs.append(zip(*list(_run_simulation(sampler, pool.copy, test))))
+    # return train_sizes, train_scores, test_scores
+    return (list(zip(*i)) for i in zip(*runs))
+
+
+def _run_simulation(sampler, pool, test, seed_size=100):
+    """ Yield train_size, train_score, test_score per batch. """
+    # get test data
+    X_test, y_test = zip(*test.oracle_items)
+    # seed with batch_size labels before training
+    pool.seed(sampler.batch_size)
+    # sample until pool is empty, yielding train/test f1
+    for i in itertools.count():
+        print('..batch {}..'.format(i))
+        # evaluate
+        yield next(sampler.fit_and_score(pool, X_test, y_test))
+        # get next batch
+        batch = list(sampler(pool))
+        # stop if no more data to sample
+        if not batch:
+            break
+        # add batch examples with oracle labels
+        for text, label in sampler(pool):
+            label = pool.get_oracle_label(text)
+            pool.add_label(text, label)
+
+
+def run_bootstraps(sampler, pool, test, n=3):
+    # get test data
+    X_test, y_test = zip(*test.oracle_items)
+    # seed and evaluate
+    pool.seed(sampler.batch_size)
+    # sample and bootstrap
+    runs = []
+    for i in itertools.count():
+        print('Running batch {}..'.format(i))
+        # evaluate with n bootstrap resamples of labelled data
+        runs.append(list(sampler.fit_and_score(pool, X_test, y_test, n)))
+        # get next batch
+        batch = list(sampler(pool))
+        # stop if no more data to sample
+        if not batch:
+            break
+        # add batch examples with oracle labels
+        for text, label in batch:
+            label = pool.get_oracle_label(text)
+            pool.add_label(text, label)
+    return zip(*[zip(*i) for i in runs])
