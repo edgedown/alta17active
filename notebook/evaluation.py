@@ -1,10 +1,9 @@
+from dataset import Dataset
 from sklearn.metrics import f1_score, make_scorer
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import random
-
-from dataset import Dataset
 
 
 f1_scorer = make_scorer(f1_score)

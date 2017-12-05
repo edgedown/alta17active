@@ -3,6 +3,13 @@ import csv
 import random
 
 
+def pool_data(datasets):
+    pooled = Dataset()
+    for k, d in datasets:
+        pooled.update(d)
+    return pooled
+
+
 class Dataset(object):
     """ Encapsulates unlabelled and labelled examples. """
     def __init__(self, text_to_label=None):
@@ -20,11 +27,13 @@ class Dataset(object):
         return ((text, label) for text, label in
                 self._annotation.items())
 
+    def __getitem__(self, text):
+        return self._annotation.get(text)
+
     def to_csv(self, fname):
         with open(fname, 'w') as f:
             w = csv.writer(f, delimiter=',')
-            for text, label in self._annotation.items():
-                w.writerow((label, text))
+            w.writerows(self.labelled_items)
 
     @classmethod
     def from_csv(cls, fname):
