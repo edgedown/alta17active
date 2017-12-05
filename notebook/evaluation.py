@@ -3,6 +3,8 @@ import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 
+from dataset import Dataset
+
 
 f1_scorer = make_scorer(f1_score)
 
@@ -97,3 +99,18 @@ def run_bootstraps(sampler, pool, test, n=3):
             label = pool.get_oracle_label(text)
             pool.add_label(text, label)
     return zip(*[zip(*i) for i in runs])
+
+
+def label_for_submission(dataset, clf, dataset_name, username='username'):
+    assert isinstance(dataset, Dataset)
+    assert hasattr(clf, 'predict')
+    assert dataset_name in {'dev', 'test'}
+    dataset_preds = dataset.copy
+    to_predict = list(i[0] for i in dataset_preds.unlabelled_items)
+    labels = clf.predict(to_predict)
+    predictions = dict(zip(to_predict, labels))
+    for text, label in dataset_preds.unlabelled_items:
+        dataset_preds.add_label(text, predictions[text])
+    fname = '../submissions/{}/{}.csv'.format(username, dataset_name)
+    dataset_preds.to_csv(fname)
+    print('Written submission to {}'.format(fname))
