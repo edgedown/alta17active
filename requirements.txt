@@ -1,6 +1,7 @@
 ipywidgets
 jupyter
 matplotlib
+nltk
 numpy
 pandas
 scikit-learn >= 0.19

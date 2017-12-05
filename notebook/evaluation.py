@@ -37,7 +37,7 @@ def plot_learning_curve(train_sizes, train_scores, test_scores):
     return plt
 
 
-def run_simulations(sampler, pool, test, n=5):
+def run_simulations(sampler, pool, test, n=3):
     """
     Run n simulated learning-curve experiments.
     
