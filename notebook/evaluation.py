@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+from dataset import Dataset
+
 
 f1_scorer = make_scorer(f1_score)
 
@@ -124,3 +126,18 @@ def resample(X, y):
     for _ in range(N):
         i = random.randint(0, N - 1)
         yield X[i], y[i]
+
+
+def label_for_submission(dataset, clf, dataset_name, username='username'):
+    assert isinstance(dataset, Dataset)
+    assert hasattr(clf, 'predict')
+    assert dataset_name in {'dev', 'test'}
+    dataset_preds = dataset.copy
+    to_predict = list(i[0] for i in dataset_preds.unlabelled_items)
+    labels = clf.predict(to_predict)
+    predictions = dict(zip(to_predict, labels))
+    for text, label in dataset_preds.unlabelled_items:
+        dataset_preds.add_label(text, predictions[text])
+    fname = '../submissions/{}/{}.csv'.format(username, dataset_name)
+    dataset_preds.to_csv(fname)
+    print('Written submission to {}'.format(fname))
