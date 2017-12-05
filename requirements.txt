@@ -5,3 +5,4 @@ numpy
 pandas
 scikit-learn >= 0.19
 scipy
+seaborn
