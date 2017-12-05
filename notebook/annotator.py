@@ -7,6 +7,7 @@ class AnnotationPane(object):
     LABELS = [
         ('Yes', True),
         ('No', False),
+        ('Skip', None),
     ]
 
     def __init__(self, dataset, sampler):

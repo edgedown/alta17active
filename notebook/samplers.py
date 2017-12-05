@@ -1,4 +1,4 @@
-from evaluation import f1_scorer
+from evaluation import fit_and_score
 import random
 
 
@@ -29,32 +29,12 @@ class Sampler(object):
         X_train, y_train = zip(*pool.labelled_items)
         self.pipeline.fit(X_train, y_train)
 
-    def f1_score(self, X, y):
-        return f1_scorer(self.pipeline, X, y)
-
     def fit_and_score(self, pool, X_test, y_test, n=1):
         """
         Fit model to labelled data from pool and score on train and test.
         If n>1, then run n times with bootstrapped training data.
         """
-        for i in range(n):
-            X_train, y_train = zip(*pool.labelled_items)
-            if n > 1:
-                X_boot, y_boot = zip(*self.resample(X_train, y_train))
-            else:
-                X_boot, y_boot = X_train, y_train
-            print('..fitting to {} labelled examples..'.format(len(X_train)))
-            self.pipeline.fit(X_boot, y_boot)
-            f1_boot = self.f1_score(X_boot, y_boot)
-            f1_test = self.f1_score(X_test, y_test)
-            yield len(X_boot), f1_boot, f1_test
-
-    def resample(self, X, y):
-        """ Yield len(X) items sampled with replacement from X, y. """
-        N = len(X)
-        for _ in range(N):
-            i = random.randint(0, N - 1)
-            yield X[i], y[i]
+        return iter(fit_and_score(self.pipeline, pool, X_test, y_test, n=n))
 
 
 class Random(Sampler):

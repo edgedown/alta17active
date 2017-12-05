@@ -2,6 +2,7 @@ from sklearn.metrics import f1_score, make_scorer
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 
 f1_scorer = make_scorer(f1_score)
@@ -82,11 +83,11 @@ def run_bootstraps(sampler, pool, test, n=3):
     # seed and evaluate
     pool.seed(sampler.batch_size)
     # sample and bootstrap
-    runs = []
+    batches = []
     for i in itertools.count():
         print('Running batch {}..'.format(i))
         # evaluate with n bootstrap resamples of labelled data
-        runs.append(list(sampler.fit_and_score(pool, X_test, y_test, n)))
+        batches.append(list(sampler.fit_and_score(pool, X_test, y_test, n)))
         # get next batch
         batch = list(sampler(pool))
         # stop if no more data to sample
@@ -96,4 +97,30 @@ def run_bootstraps(sampler, pool, test, n=3):
         for text, label in batch:
             label = pool.get_oracle_label(text)
             pool.add_label(text, label)
-    return zip(*[zip(*i) for i in runs])
+    return zip(*[zip(*i) for i in batches])
+
+
+def fit_and_score(pipeline, pool, X_test, y_test, n=1):
+    """                                                                                                              
+    Fit model to labelled data from pool and score on train and test.                                                
+    If n>1, then run n times with bootstrapped training data.                                                        
+    """
+    for i in range(n):
+        X_train, y_train = zip(*pool.labelled_items)
+        if n > 1:
+            X_boot, y_boot = zip(*resample(X_train, y_train))
+        else:
+            X_boot, y_boot = X_train, y_train
+        print('..fitting to {} labelled examples..'.format(len(X_train)))
+        pipeline.fit(X_boot, y_boot)
+        f1_boot = f1_scorer(pipeline, X_boot, y_boot)
+        f1_test = f1_scorer(pipeline, X_test, y_test)
+        yield len(X_boot), f1_boot, f1_test
+
+
+def resample(X, y):
+    """ Yield len(X) items sampled with replacement from X, y. """
+    N = len(X)
+    for _ in range(N):
+        i = random.randint(0, N - 1)
+        yield X[i], y[i]
